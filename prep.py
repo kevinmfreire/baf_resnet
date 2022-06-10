@@ -155,22 +155,24 @@ def normalization(image):
     out = np.nan_to_num(out)
     return (out,mean_image,std_image)
 
-#first_patient = load_scan(path)
-#first_patient_pixels = get_pixels_hu(first_patient)
-#plt.figure()
-#plt.subplot(3,1,3)
-#plt.hist(first_patient_pixels.flatten(), bins=80, color='c')
-#plt.xlabel("Hounsfield Units (HU)")
-#plt.ylabel("Frequency")
-#plt.show()
-#pix_resampled, spacing = resample(first_patient_pixels, first_patient, [1,1,1])
-#print("Shape before resampling\t", first_patient_pixels.shape)
-#print("Shape after resampling\t", pix_resampled.shape)
-## Show some slice in the middle
-#plt.subplot(3,1,1),plt.imshow(first_patient_pixels[2], cmap=plt.cm.gray)
-#plt.show()
-#
-#image = windowing(first_patient_pixels,-1000,500)
-#plt.subplot(3,1,2),plt.imshow(image[2], cmap=plt.cm.gray)
-#plt.show()
-#
+if __name__ == '__main__':
+
+    #first_patient = load_scan(path)
+    #first_patient_pixels = get_pixels_hu(first_patient)
+    #plt.figure()
+    #plt.subplot(3,1,3)
+    #plt.hist(first_patient_pixels.flatten(), bins=80, color='c')
+    #plt.xlabel("Hounsfield Units (HU)")
+    #plt.ylabel("Frequency")
+    #plt.show()
+    #pix_resampled, spacing = resample(first_patient_pixels, first_patient, [1,1,1])
+    #print("Shape before resampling\t", first_patient_pixels.shape)
+    #print("Shape after resampling\t", pix_resampled.shape)
+    ## Show some slice in the middle
+    #plt.subplot(3,1,1),plt.imshow(first_patient_pixels[2], cmap=plt.cm.gray)
+    #plt.show()
+    #
+    #image = windowing(first_patient_pixels,-1000,500)
+    #plt.subplot(3,1,2),plt.imshow(image[2], cmap=plt.cm.gray)
+    #plt.show()
+    #
