@@ -12,6 +12,22 @@ from tensorflow.keras.layers import BatchNormalization as BN
 
 from typing import Callable, Any, Optional, Tuple, List
 
+# BELOW IS AN EXAMPLE OF HOW TO IMPLEMENT MODEL WAS A CLASS
+# import tensorflow as tf
+
+# class MyModel(tf.keras.Model):
+
+#   def __init__(self):
+#     super().__init__()
+#     self.dense1 = tf.keras.layers.Dense(4, activation=tf.nn.relu)
+#     self.dense2 = tf.keras.layers.Dense(5, activation=tf.nn.softmax)
+
+#   def call(self, inputs):
+#     x = self.dense1(inputs)
+#     return self.dense2(x)
+
+# model = MyModel()
+
 # Spatial Attention
 def SA(feat_map):
     conv1 = Conv2D(64, (1,1), strides=1, padding='valid')(feat_map)
