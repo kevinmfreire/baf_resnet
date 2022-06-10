@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-@author: lgmarcos
+@author: kevinmfreire
 """
 #Model Components
 import tensorflow as tf
@@ -122,6 +122,7 @@ def baf_resnet(inputs):
     return resnet
 
 # -------------------------------End---------------------------------------------
+
 if __name__ == '__main__':
 
     input=(None, None, 1)
