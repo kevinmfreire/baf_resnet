@@ -5,102 +5,172 @@ This code uses perceptual loss, dissimilarity index and noise conscious mse for 
 loss: vgg16 ['block1_conv2','block2_conv2','block3_conv3','block4_conv3']
 @author: kevinmfreire
 """
-
-import numpy as np
-import tensorflow as tf
-
-# from keras.models import Model
-# from keras.layers import Dense,concatenate, Activation, Lambda
-# from keras.layers import Conv2D, add, Input,Conv2DTranspose
-# from keras.optimizers import SGD,Adam
-from keras import losses
-# from keras.preprocessing.image import ImageDataGenerator
-# from matplotlib import pyplot as plt
-# import math
-# import h5py
-# from keras.initializers import RandomNormal
-# #from preprocess_CT_image import load_scan, get_pixels_hu, write_dicom, map_0_1,windowing2
-# from keras.layers import BatchNormalization as BN
-
-from keras import backend as K
-
-from keras.applications.vgg16 import VGG16
-from keras.models import Model
-
+import torch.nn as nn
+import torch
+import torch.nn.functional as F
+import argparse
 from math import exp
+from torch.autograd import Variable
+from torch import linalg
+import torchvision.models as models
+from torchvision import transforms
+from torchvision.models._utils import IntermediateLayerGetter
+from torch.nn.modules.loss import _Loss
 
-class SSIM(object):
-    def __init__(self, k1=0.01, k2=0.02, L=1, window_size=11):
-        self.k1 = k1
-        self.k2 = k2           # constants for stable
-        self.L = L             # the value range of input image pixels
-        self.WS = window_size
+# Check CUDA's presence
+cuda_is_present = True if torch.cuda.is_available() else False
+Tensor = torch.cuda.FloatTensor if cuda_is_present else torch.FloatTensor
 
-    def _tf_fspecial_gauss(self, size, sigma=1.5):
-        """Function to mimic the 'fspecial' gaussian MATLAB function"""
-        x_data, y_data = np.mgrid[-size//2 + 1:size//2 + 1, -size//2 + 1:size//2 + 1]
+def to_cuda(data):
+    	return data.cuda() if cuda_is_present else data
 
-        x_data = np.expand_dims(x_data, axis=-1)
-        x_data = np.expand_dims(x_data, axis=-1)
+def normalize_(image, MIN_B=-1024.0, MAX_B=3072.0):
+    image = (image - MIN_B) / (MAX_B - MIN_B)
+    return image
 
-        y_data = np.expand_dims(y_data, axis=-1)
-        y_data = np.expand_dims(y_data, axis=-1)
+def gaussian(window_size, sigma):
+    gauss = torch.Tensor([exp(-(x - window_size//2)**2/float(2*sigma**2)) for x in range(window_size)])
+    return gauss/gauss.sum()
 
-        x = tf.constant(x_data, dtype=tf.float32)
-        y = tf.constant(y_data, dtype=tf.float32)
+def create_window(window_size, channel):
+    _1D_window = gaussian(window_size, 1.5).unsqueeze(1)
+    _2D_window =_1D_window.mm(_1D_window.t()).float().unsqueeze(0).unsqueeze(0)
+    window = Variable(_2D_window.expand(channel, 1, window_size, window_size).contiguous())
+    return  to_cuda(window)
 
-        g = tf.exp(-((x**2 + y**2)/(2.0*sigma**2)))
-        return g / tf.reduce_sum(g)
+# OBTAIN VGG16 PRETRAINED MODEL EXCLUDING FULLY CONNECTED LAYERS
+def get_feature_layer_vgg16(image, layer, model):
+    image = torch.cat([image,image,image],1)
+    return_layers = {'{}'.format(layer): 'feat_layer_{}'.format(layer)}
+    output_feature = IntermediateLayerGetter(model.features, return_layers=return_layers)
+    image_feature = output_feature(image)
+    return image_feature['feat_layer_{}'.format(layer)]
 
-    def ssim_loss(self, img1, img2):
-        """
-        The function is to calculate the ssim score
-        """
-        window = self._tf_fspecial_gauss(size=self.WS)  # output size is (window_size, window_size, 1, 1)
-        #import pdb
-        #pdb.set_trace()
+def compute_SSIM(img1, img2, window_size, channel, size_average=True):
+    # referred from https://github.com/Po-Hsun-Su/pytorch-ssim
+    if len(img1.size()) == 2:
+        shape_ = img1.shape[-1]
+        img1 = img1.view(1,1,shape_ ,shape_ )
+        img2 = img2.view(1,1,shape_ ,shape_ )
+    window = create_window(window_size, channel)
+    window = window.type_as(img1)
 
-        (_, _, _, channel) = img1.shape.as_list()
+    mu1 = F.conv2d(img1, window, padding=window_size//2)
+    mu2 = F.conv2d(img2, window, padding=window_size//2)
+    mu1_sq, mu2_sq = mu1.pow(2), mu2.pow(2)
+    mu1_mu2 = mu1*mu2
 
-        window = tf.tile(window, [1, 1, channel, 1])
+    sigma1_sq = F.conv2d(img1*img1, window, padding=window_size//2) - mu1_sq
+    sigma2_sq = F.conv2d(img2*img2, window, padding=window_size//2) - mu2_sq
+    sigma12 = F.conv2d(img1*img2, window, padding=window_size//2) - mu1_mu2
 
-        # here we use tf.nn.depthwise_conv2d to imitate the group operation in torch.nn.conv2d 
-        mu1 = tf.nn.depthwise_conv2d(img1, window, strides = [1, 1, 1, 1], padding = 'VALID')
-        mu2 = tf.nn.depthwise_conv2d(img2, window, strides = [1, 1, 1, 1], padding = 'VALID')
+    C1, C2 = 0.01**2, 0.03**2
 
-        mu1_sq = mu1 * mu1
-        mu2_sq = mu2 * mu2
-        mu1_mu2 = mu1 * mu2
+    ssim_map = ((2*mu1_mu2+C1)*(2*sigma12+C2)) / ((mu1_sq+mu2_sq+C1)*(sigma1_sq+sigma2_sq+C2))
 
-        img1_2 = img1*img1#tf.pad(img1*img1, [[0,0], [0, self.WS//2], [0, self.WS//2], [0,0]], "CONSTANT")
-        sigma1_sq = tf.subtract(tf.nn.depthwise_conv2d(img1_2, window, strides = [1 ,1, 1, 1], padding = 'VALID') , mu1_sq)
-        img2_2 = img2*img2#tf.pad(img2*img2, [[0,0], [0, self.WS//2], [0, self.WS//2], [0,0]], "CONSTANT")
-        sigma2_sq = tf.subtract(tf.nn.depthwise_conv2d(img2_2, window, strides = [1, 1, 1, 1], padding = 'VALID') ,mu2_sq)
-        img12_2 = img1*img2#tf.pad(img1*img2, [[0,0], [0, self.WS//2], [0, self.WS//2], [0,0]], "CONSTANT")
-        sigma1_2 = tf.subtract(tf.nn.depthwise_conv2d(img12_2, window, strides = [1, 1, 1, 1], padding = 'VALID') , mu1_mu2)
+    if size_average:
+        return ssim_map.mean()
+    else:
+        return ssim_map.mean(1).mean(1).mean(1)
 
-        c1 = (self.k1*self.L)**2
-        c2 = (self.k2*self.L)**2
+class Vgg16FeatureExtractor(nn.Module):
+    
+    def __init__(self, layers=[3, 8, 15, 22, 29],pretrained=False, progress=True, **kwargs):
+        super(Vgg16FeatureExtractor, self).__init__()
+        self.layers=layers
+        self.model = models.vgg16(pretrained, progress, **kwargs)
+        del self.model.avgpool
+        del self.model.classifier
+        self.return_layers = {'{}'.format(self.layers[i]): 'feat_layer_{}'.format(self.layers[i]) for i in range(len(self.layers))}
+        self.model = IntermediateLayerGetter(self.model.features, return_layers=self.return_layers)
+        self.normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],std=[0.229, 0.224, 0.225])
 
-        ssim_map = ((2*mu1_mu2 + c1)*(2*sigma1_2 + c2)) / ((mu1_sq + mu2_sq + c1)*(sigma1_sq + sigma2_sq + c2))
+    def forward(self, x):
+        feats = list()
+        # x = self.normalize(x)
+        out = self.model(x)
+        for i in range(len(self.layers)):
+            feats.append(out['feat_layer_{}'.format(self.layers[i])])
+        return feats
 
-        return tf.reduce_mean(ssim_map)
+class MPL(nn.Module):
+    """
+    The Multi Perceptual Loss Function
+    """
+    def __init__(self):
+        super(MPL, self).__init__()
+        self.model = models.vgg16(pretrained=True)
+        self.model.to(torch.device('cuda' if cuda_is_present else 'cpu'))
+        self.model.eval()
+    def forward(self, target, prediction):
+        perceptual_loss = 0
+        vgg19_layers = [3, 8, 15, 22, 29] # layers: 3, 8, 15, 22, 29
+        for layer in vgg19_layers:
+            feature_target = get_feature_layer_vgg16(target, layer, self.model)
+            feature_prediction = get_feature_layer_vgg16(prediction, layer, self.model)
+            _, _, H, W = feature_target.size()
+            feature_count = W*H
+            feature_difference = feature_target - feature_prediction
+            # feature_loss = feature_difference.norm(dim=1, p=2) / float(feature_count)
+            feature_loss = linalg.norm(feature_difference, dim=1, ord=2) / float(feature_count)
+            perceptual_loss += feature_loss.mean()
+        return perceptual_loss
 
-def perceptual_loss(y_true, y_pred):
-    vgg = VGG16(include_top=False, weights='imagenet', input_shape=image_shape)
-    selectedLayers = ['block1_conv2','block2_conv2','block3_conv3','block4_conv3']
-    selectedOutputs = [vgg.get_layer(i).output for i in selectedLayers]
-    loss_model = Model(inputs=vgg.input, outputs=selectedOutputs)
-    loss_model.trainable = False
-    mse = K.variable(value=0)
-    for i in range(0,3):
-        mse = mse+ K.mean(K.square(loss_model(y_true)[i] - loss_model(y_pred)[i]))
-    return mse
-#
-#model_edge_p.load_weights('Weights/weights_DRL_sobel4d_adam1_perceptual_mse_th.h5')
-loss = [perceptual_loss, losses.mean_squared_error, SSIM.ssim_loss]
-loss_weights = [40,20,40]
+class SSIM(nn.Module):
+    """
+    The Dissimilarity Loss funciton
+    """
+    def __init__(self, window_size = 11, size_average = True):
+        super(SSIM, self).__init__()
+        
+        self.window_size = window_size
+        self.size_average = size_average
+        self.channel = 1
+        self.window = create_window(window_size, self.channel)
+        self.window.to(torch.device('cuda' if cuda_is_present else 'cpu'))
 
-if __name__ == '__main__':
-    # print(gaussian(5, 3.5))
-    image_shape = (None,None, 3)
+    def forward(self, pred, target):
+        # target, pred = denormalize_(target), denormalize_(pred)
+        ssim = compute_SSIM(target, pred, self.window_size, self.channel, self.size_average)
+        dssim = (1.0-ssim)
+        return dssim
+
+class CompoundLoss(nn.Module):
+    
+    def __init__(self, blocks=[1, 2, 3, 4, 5], vgg_weight=0.3, ssim_weight=0.5, mse_weight=0.2):
+        super(CompoundLoss, self).__init__()
+
+        self.vgg_weight = vgg_weight
+        self.ssim_weight = ssim_weight
+        self.mse_weight = mse_weight
+
+        self.blocks = blocks
+        self.model = Vgg16FeatureExtractor(pretrained=True)
+
+        if torch.cuda.is_available():
+            self.model = self.model.cuda()
+        self.model.eval()
+
+        self.mse = nn.MSELoss()
+        self.ssim = SSIM()
+
+    def forward(self, pred, ground_truth):
+        loss_value = 0
+
+        input_feats = self.model(torch.cat([pred, pred, pred], dim=1))
+        target_feats = self.model(torch.cat([ground_truth, ground_truth, ground_truth], dim=1))
+
+        feats_num = len(self.blocks)
+        for idx in range(feats_num):
+            input, target = input_feats[idx], target_feats[idx]
+            loss_value += self.mse(input, target)
+
+        loss_value /= feats_num
+        # loss_mse = self.mse(pred, ground_truth)
+        ssim_loss = self.ssim(pred, ground_truth)
+        mse_loss = self.mse(pred, ground_truth)
+        
+        loss = self.vgg_weight * loss_value + self.ssim_weight * ssim_loss + self.mse_weight * mse_loss
+        # loss = self.vgg_weight * loss_value + ssim_loss + gen_loss
+        # loss = loss_value + loss_mse
+        return loss
