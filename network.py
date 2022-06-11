@@ -3,30 +3,36 @@
 @author: kevinmfreire
 """
 #Model Components
-import tensorflow as tf
-from tensorflow.keras.models import Model
-from tensorflow.keras.layers import Conv2D, Multiply, Conv2DTranspose
-from tensorflow.keras.layers import Activation, AveragePooling2D
-from tensorflow.keras.layers import Add, concatenate, Input
-from tensorflow.keras.layers import BatchNormalization as BN
-
-from typing import Callable, Any, Optional, Tuple, List
-
-# BELOW IS AN EXAMPLE OF HOW TO IMPLEMENT MODEL WAS A CLASS
 # import tensorflow as tf
+# from tensorflow.keras.models import Model
+# from tensorflow.keras.layers import Conv2D, Multiply, Conv2DTranspose
+# from tensorflow.keras.layers import Activation, AveragePooling2D
+# from tensorflow.keras.layers import Add, concatenate, Input
+# from tensorflow.keras.layers import BatchNormalization as BN
 
-# class MyModel(tf.keras.Model):
 
-#   def __init__(self):
-#     super().__init__()
-#     self.dense1 = tf.keras.layers.Dense(4, activation=tf.nn.relu)
-#     self.dense2 = tf.keras.layers.Dense(5, activation=tf.nn.softmax)
+import torch.nn as nn
+import torch
+import torch.nn.functional as F
+from math import exp
+from torch.autograd import Variable
+import numpy as np
+from typing import Callable, Any, Optional, Tuple, List
+import warnings
+from torchsummary import summary
 
-#   def call(self, inputs):
-#     x = self.dense1(inputs)
-#     return self.dense2(x)
+class spatial_attention():
+    def __init__(self):
+        super(spatial_attention, self).__init__()
+        self.conv1 = nn.Conv2d(64, 64, 1, 1, padding='valid')
+        self.conv2 = nn.Conv2d(64, 64, 1, 1, padding='valid')
+        self.conv3 = nn.Conv2d(64, 64, 1, 1, padding='valid')
+        self.final_conv = nn.Conv2d(64, 64, 1, 1, padding='valid')
 
-# model = MyModel()
+    def forward(self, x):
+
+        return 
+
 
 # Spatial Attention
 def SA(feat_map):
@@ -85,6 +91,34 @@ def BMG(bmg_input):
     fg = Add()([bmg_input,bafbn]) #group skip connection 
     return fg
 
+class BasicConv2d(nn.Module):
+    def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding='same', dilation=1):
+        super(BasicConv2d, self).__init__()
+        self.conv = nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding, dilation, bias=False)
+        self.bn = nn.BatchNorm2d(out_channels, eps=0.001)
+
+    def forward(self, x):
+        x = self.conv(x)
+        x = self.bn(x)
+        return F.relu(x, inplace=True)
+
+class bafnet(nn.Module):
+    def __init__(self, conv_block: Optional[Callable[..., nn.Module]] = None):
+        super(bafnet, self).__init__()
+        if conv_block is None:
+            conv_block = BasicConv2d
+
+        self.conv1 = conv_block(1, 64, 3, dilation=2)
+        self.conv2 = conv_block(64, 64, 3, dilation=2)
+        self.conv3 = conv_block(64, 64, 3, dilation=2)
+
+    def forward(self, x):
+        conv1 = self.conv1(x)
+        conv2 = self.conv2(conv1)
+        add1 = x + conv2
+        conv3 = self.conv3(add1)
+        return x
+
 def baf_resnet(inputs):
     # inputs=(None, None, 1)
     inputs=Input(shape=inputs)
@@ -141,6 +175,8 @@ def baf_resnet(inputs):
 
 if __name__ == '__main__':
 
-    input=(None, None, 1)
-    model=baf_resnet(input)
-    model.summary()
+    input=(1, 120, 120)
+    # model=baf_resnet(input)
+    baf_net = bafnet()
+    summary(baf_net, input)
+    # model.summary()
