@@ -93,29 +93,6 @@ class Vgg16FeatureExtractor(nn.Module):
             feats.append(out['feat_layer_{}'.format(self.layers[i])])
         return feats
 
-class MPL(nn.Module):
-    """
-    The Multi Perceptual Loss Function
-    """
-    def __init__(self):
-        super(MPL, self).__init__()
-        self.model = models.vgg16(pretrained=True)
-        self.model.to(torch.device('cuda' if cuda_is_present else 'cpu'))
-        self.model.eval()
-    def forward(self, target, prediction):
-        perceptual_loss = 0
-        vgg19_layers = [3, 8, 15, 22, 29] # layers: 3, 8, 15, 22, 29
-        for layer in vgg19_layers:
-            feature_target = get_feature_layer_vgg16(target, layer, self.model)
-            feature_prediction = get_feature_layer_vgg16(prediction, layer, self.model)
-            _, _, H, W = feature_target.size()
-            feature_count = W*H
-            feature_difference = feature_target - feature_prediction
-            # feature_loss = feature_difference.norm(dim=1, p=2) / float(feature_count)
-            feature_loss = linalg.norm(feature_difference, dim=1, ord=2) / float(feature_count)
-            perceptual_loss += feature_loss.mean()
-        return perceptual_loss
-
 class SSIM(nn.Module):
     """
     The Dissimilarity Loss funciton
@@ -166,11 +143,9 @@ class CompoundLoss(nn.Module):
             loss_value += self.mse(input, target)
 
         loss_value /= feats_num
-        # loss_mse = self.mse(pred, ground_truth)
         ssim_loss = self.ssim(pred, ground_truth)
         mse_loss = self.mse(pred, ground_truth)
         
         loss = self.vgg_weight * loss_value + self.ssim_weight * ssim_loss + self.mse_weight * mse_loss
-        # loss = self.vgg_weight * loss_value + ssim_loss + gen_loss
-        # loss = loss_value + loss_mse
+
         return loss
