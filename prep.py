@@ -8,7 +8,7 @@ import os
 import argparse
 import numpy as np
 import pydicom
-import scipy.ndimage
+# import scipy.ndimage
 
 def save_dataset(args):
     if not os.path.exists(args.save_path):
@@ -61,7 +61,7 @@ def get_pixels_hu(slices):
             image[slice_number] = slope * image[slice_number].astype(np.float64)
             image[slice_number] = image[slice_number].astype(np.int16)
         image[slice_number] += np.int16(intercept)
-    return np.array(image, dtype=np.int16)
+    return normalization(np.array(image, dtype=np.int16))
 
 
 def normalize_(image, MIN_B=-1024.0, MAX_B=3072.0):
@@ -73,22 +73,22 @@ def normalization(image):
     std_image = np.std(image,axis = 0).astype(np.float32)
     out = ((image-mean_image)/std_image).astype(np.float32)
     out = np.nan_to_num(out)
-    return (out,mean_image,std_image)
+    return out
 
 # To have similar thickness when using different datasets
-def resample(image, scan, new_spacing=[1,1,1]):
-    # Determine current pixel spacing
-    spacing = np.array([scan[0].SliceThickness] + scan[0].PixelSpacing, dtype=np.float32)
+# def resample(image, scan, new_spacing=[1,1,1]):
+#     # Determine current pixel spacing
+#     spacing = np.array([scan[0].SliceThickness] + scan[0].PixelSpacing, dtype=np.float32)
 
-    resize_factor = spacing / new_spacing
-    new_real_shape = image.shape * resize_factor
-    new_shape = np.round(new_real_shape)
-    real_resize_factor = new_shape / image.shape
-    new_spacing = spacing / real_resize_factor
+#     resize_factor = spacing / new_spacing
+#     new_real_shape = image.shape * resize_factor
+#     new_shape = np.round(new_real_shape)
+#     real_resize_factor = new_shape / image.shape
+#     new_spacing = spacing / real_resize_factor
     
-    image = scipy.ndimage.interpolation.zoom(image, real_resize_factor, mode='nearest')
+#     image = scipy.ndimage.interpolation.zoom(image, real_resize_factor, mode='nearest')
     
-    return image, new_spacing
+#     return image, new_spacing
 
 #  map array between zero and 1 , find max and min
 def map_0_1(array):

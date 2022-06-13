@@ -98,7 +98,7 @@ class bafnet(nn.Module):
         # Reconstruction Section
         self.deconv = conv_block(64, 64, 3, dilation=2)
 
-        self.out = nn.ConvTranspose2d(64, 1, 3, stride=1, dilation=2)
+        self.out = nn.ConvTranspose2d(64, 1, 3, stride=1, dilation=2, padding=2)
 
     def forward(self, x):
         conv1 = self.conv_1(x)
