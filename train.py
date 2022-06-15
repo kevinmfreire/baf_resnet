@@ -182,24 +182,28 @@ for epoch in tq_epoch:
                 'lr': lr,
                 'total_iters': total_iters
             }
-    torch.save(saved_model, '{}latest_ckpt.pth.tar'.format(args.save_path))
+    torch.save(saved_model, '{}epoch_{}_ckpt.pth.tar'.format(args.save_path, epoch))
 
     save_loss = './model/loss_arr.py'
     np.save(save_loss, losses, allow_pickle=True)
 
     tq_epoch.set_postfix({'STEP': total_iters,'AVG_LOSS': '{:.5f}'.format(avg_loss)})
 	
-	# Saving model after every 10 epoch
-    # if epoch % 2 == 0:
-    #     saved_model = {
-    #         'epoch': epoch ,
-    #         'netG_state_dict': net.state_dict(),
-    #         'optG_state_dict': optimizer_net.state_dict(),
-    #         'lr': lr,
-    #         'total_iters': total_iters
-    #     }
-    #     torch.save(saved_model, '{}latest_ckpt.pth.tar'.format(args.save_path))
-    #     cmd1 = 'cp {}latest_ckpt.pth.tar /gdrive/MyDrive/rigan_model/epoch_{}_ckpt.pth.tar'.format(args.save_path, epoch)
-    #     cmd2 = 'cp {}latest_ckpt.pth.tar /gdrive/MyDrive/rigan_model/'.format(args.save_path)
-    #     os.system(cmd1)
-    #     os.system(cmd2)
+	# Saving model after every 2 epoch to drive
+    if epoch % 2 == 0:
+        if not os.path.exists(args.save_path):
+            os.makedirs(args.save_path)
+        print('Create path : {}'.format(args.save_path))
+        print('Saving model to: ' + args.save_path)
+        saved_model = {
+            'epoch': epoch ,
+            'netG_state_dict': net.state_dict(),
+            'optG_state_dict': optimizer_net.state_dict(),
+            'lr': lr,
+            'total_iters': total_iters
+        }
+        torch.save(saved_model, '{}epoch_{}_ckpt.pth.tar'.format(args.save_path, epoch))
+        cmd1 = 'cp {}latest_ckpt.pth.tar /gdrive/MyDrive/rigan_model/epoch_{}_ckpt.pth.tar'.format(args.save_path, epoch)
+        cmd2 = 'cp {}latest_ckpt.pth.tar /gdrive/MyDrive/rigan_model/'.format(args.save_path)
+        os.system(cmd1)
+        os.system(cmd2)
