@@ -61,12 +61,16 @@ def get_pixels_hu(slices):
             image[slice_number] = slope * image[slice_number].astype(np.float64)
             image[slice_number] = image[slice_number].astype(np.int16)
         image[slice_number] += np.int16(intercept)
-    return normalization(np.array(image, dtype=np.int16))
+    return normalize_(np.array(image, dtype=np.int16))
 
 
 def normalize_(image, MIN_B=-1024.0, MAX_B=3072.0):
    image = (image - MIN_B) / (MAX_B - MIN_B)
    return image
+
+def denormalize_(image, MIN_B=-1024.0, MAX_B=3072.0):
+    image = (image * (MAX_B - MIN_B)) + MIN_B
+    return image
 
 def normalization(image):
     mean_image = np.mean(image, axis = 0).astype(np.float32)

@@ -38,7 +38,7 @@ parser.add_argument('--decay_iters', type=int, default=6000)
 parser.add_argument('--gan_alt', type=int, default=2)
 
 parser.add_argument('--transform', type=bool, default=False)
-# if patch training, batch size is (--patch_n * --batch_size)
+# if patch training, batch size is (--patch_n * --batch_size)s
 parser.add_argument('--patch_n', type=int, default=16)		# default = 4
 parser.add_argument('--patch_size', type=int, default=32)	# default = 100
 parser.add_argument('--batch_size', type=int, default=4)	# default = 5
@@ -47,7 +47,7 @@ parser.add_argument('--image_size', type=int, default=512)
 parser.add_argument('--lr', type=float, default=0.0002) # 5e-5 without decaying rate
 parser.add_argument('--num_epochs', type=int, default=500)
 parser.add_argument('--num_workers', type=int, default=4)
-parser.add_argument('--load_chkpt', type=bool, default=False)
+parser.add_argument('--load_chkpt', type=bool, default=True)
 
 parser.add_argument('--norm_range_min', type=float, default=-1024.0)
 parser.add_argument('--norm_range_max', type=float, default=3072.0)
@@ -75,11 +75,11 @@ def to_cuda(data):
 
 if args.load_chkpt:
 	print('Loading Chekpoint')
-	whole_model = torch.load(args.save_path+ 'epoch_15_ckpt.pth.tar', map_location=torch.device('cuda' if cuda_is_present else 'cpu'))
+	whole_model = torch.load(args.save_path+ 'latest_ckpt.pth.tar', map_location=torch.device('cuda' if cuda_is_present else 'cpu'))
 	net_state_dict,opt_state_dict = whole_model['net_state_dict'], whole_model['opt_state_dict']
 	net = bafnet()
 	net = to_cuda(net)
-	optimizer_net = torch.optim.Adam(net.parameters(), lr=args.lr, betas=(0.01,0.99))
+	optimizer_net = torch.optim.Adam(net.parameters(), lr=args.lr, betas=(0.01,0.999))
 	net.load_state_dict(net_state_dict)
 	optimizer_net.load_state_dict(opt_state_dict)
 	cur_epoch = whole_model['epoch']
