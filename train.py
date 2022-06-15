@@ -203,7 +203,7 @@ for epoch in tq_epoch:
             'total_iters': total_iters
         }
         torch.save(saved_model, '{}epoch_{}_ckpt.pth.tar'.format(args.save_path, epoch))
-        cmd1 = 'cp {}latest_ckpt.pth.tar /gdrive/MyDrive/rigan_model/epoch_{}_ckpt.pth.tar'.format(args.save_path, epoch)
-        cmd2 = 'cp {}latest_ckpt.pth.tar /gdrive/MyDrive/rigan_model/'.format(args.save_path)
+        cmd1 = 'cp {}epoch_{}_ckpt.pth.tar /gdrive/MyDrive/bafnet_model/epoch_{}_ckpt.pth.tar'.format(args.save_path, epoch)
+        cmd2 = 'cp {}epoch_{}_ckpt.pth.tar /gdrive/MyDrive/bafnet_model/'.format(args.save_path)
         os.system(cmd1)
         os.system(cmd2)
