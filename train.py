@@ -99,9 +99,9 @@ else:
 
 # Losses
 criterion = CompoundLoss()
-# Dloss = to_cuda(Dloss)
-# criterion = to_cuda(criterion)
+criterion = to_cuda(criterion)
 
+min_loss = 1e+10
 losses = []
 start_time = time.time()
 tq_epoch = tqdm(range(cur_epoch, args.num_epochs),position=1, leave=True, desc='Epochs')
@@ -151,59 +151,48 @@ for epoch in tq_epoch:
         data_tqdm.set_postfix({'ITER': i+1, 'LOSS': '{:.5f}'.format(loss.item())})
 
 		# Saving model after every 10 iterations
-        if total_iters % args.save_iters == 0:
-            if not os.path.exists(args.save_path):
-                os.makedirs(args.save_path)
-                print('Create path : {}'.format(args.save_path))
-            print('Saving model to: ' + args.save_path)
-            saved_model = {
-                'epoch': epoch ,
-                'net_state_dict': net.state_dict(),
-                'opt_state_dict': optimizer_net.state_dict(),
-                'lr': lr,
-                'total_iters': total_iters
-            }
-            torch.save(saved_model, '{}latest_ckpt.pth.tar'.format(args.save_path))
+        # if total_iters % args.save_iters == 0:
+        #     if not os.path.exists(args.save_path):
+        #         os.makedirs(args.save_path)
+        #         print('Create path : {}'.format(args.save_path))
+        #     print('Saving model to: ' + args.save_path)
+        #     saved_model = {
+        #         'epoch': epoch ,
+        #         'net_state_dict': net.state_dict(),
+        #         'opt_state_dict': optimizer_net.state_dict(),
+        #         'lr': lr,
+        #         'total_iters': total_iters
+        #     }
+        #     torch.save(saved_model, '{}latest_ckpt.pth.tar'.format(args.save_path))
 	
+    # Create path if it doesn't exist
+    if not os.path.exists(args.save_path):
+        os.makedirs(args.save_path)
+        print('Create path : {}'.format(args.save_path))
+
 	# Calculating average loss
     avg_loss = loss_sum/float(count)
     losses.append(avg_loss)
 
-	# Saving to google drive
-    # save_loss = '/gdrive/MyDrive/rigan_model/loss_arr.npy'
-    if not os.path.exists(args.save_path):
-        os.makedirs(args.save_path)
-        print('Create path : {}'.format(args.save_path))
-    print('Saving model to: ' + args.save_path)
-    saved_model = {
-                'epoch': epoch ,
-                'net_state_dict': net.state_dict(),
-                'opt_state_dict': optimizer_net.state_dict(),
-                'lr': lr,
-                'total_iters': total_iters
-            }
-    torch.save(saved_model, '{}epoch_{}_ckpt.pth.tar'.format(args.save_path, epoch))
-
-    save_loss = './model/loss_arr.py'
-    np.save(save_loss, losses, allow_pickle=True)
-
     tq_epoch.set_postfix({'STEP': total_iters,'AVG_LOSS': '{:.5f}'.format(avg_loss)})
-	
-	# Saving model after every 2 epoch to drive
-    if epoch % 2 == 0:
-        if not os.path.exists(args.save_path):
-            os.makedirs(args.save_path)
-        print('Create path : {}'.format(args.save_path))
+
+    # Save losses per epoch to gdrive and local
+    local_path = './model/loss_arr.py'
+    gdrive_path = '/gdrive/MyDrive/befnet_model/loss_arr.npy'
+    np.save(local_path, losses, allow_pickle=True)
+    np.save(gdrive_path, losses, allow_pickle=True)
+
+	# Saving model only if current loss is less than minimum achieved loss
+    if avg_loss < min_loss:
+        min_loss = avg_loss
         print('Saving model to: ' + args.save_path)
         saved_model = {
-            'epoch': epoch ,
-            'netG_state_dict': net.state_dict(),
-            'optG_state_dict': optimizer_net.state_dict(),
-            'lr': lr,
-            'total_iters': total_iters
-        }
-        torch.save(saved_model, '{}epoch_{}_ckpt.pth.tar'.format(args.save_path, epoch))
-        cmd1 = 'cp {}epoch_{}_ckpt.pth.tar /gdrive/MyDrive/bafnet_model/epoch_{}_ckpt.pth.tar'.format(args.save_path, epoch, epoch)
-        cmd2 = 'cp {}epoch_{}_ckpt.pth.tar /gdrive/MyDrive/bafnet_model/'.format(args.save_path, epoch)
+                    'epoch': epoch ,
+                    'net_state_dict': net.state_dict(),
+                    'opt_state_dict': optimizer_net.state_dict(),
+                    'lr': lr,
+                    'total_iters': total_iters
+                }
+        torch.save(saved_model, '{}latest_ckpt.pth.tar'.format(args.save_path))
+        cmd1 = 'cp {}latest_ckpt.pth.tar /gdrive/MyDrive/bafnet_model/'.format(args.save_path)
         os.system(cmd1)
-        os.system(cmd2)
