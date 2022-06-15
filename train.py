@@ -29,7 +29,6 @@ parser.add_argument('--load_mode', type=int, default=1)
 parser.add_argument('--data_path', type=str, default='../data')
 parser.add_argument('--saved_path', type=str, default='./processed_data/npy_img/')
 parser.add_argument('--save_path', type=str, default='./model/')
-# parser.add_argument('--save_path', type=str, default='../NCSSMP/')
 parser.add_argument('--test_patient', type=str, default='L058')
 
 parser.add_argument('--save_iters', type=int, default=50)
