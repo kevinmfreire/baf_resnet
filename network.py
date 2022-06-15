@@ -79,36 +79,39 @@ class bafnet(nn.Module):
         sam = block[1]
         cam = block[2]
 
-        # Conv blocks
+        # 1) Preconvolutional module (number of filters in each layer = 1)
         self.conv_1 = conv_block(1, 64, 3, dilation=2)
         self.conv_2 = conv_block(64, 64, 3, dilation=2)
-        self.conv_3 = conv_block(64, 64, 3, dilation=2)
 
+        # 2) Initialize the channel and spatial Attention Modules
         self.SAM = sam(64, 64, 1, 1)
         self.CAM = cam(64, 64, 1, 1)
 
-        # BAFB module
+        # 3) Initialize the convolutional layers for the Boosting Attention Fusion Block (BAFB)
         self.conv_relu = nn.Sequential(nn.Conv2d(self.in_channels, self.in_channels, 1, 1, padding='valid'),
                                     nn.ReLU())
         self.cat_conv1 = nn.Sequential(nn.Conv2d(self.in_channels*4, 1, 1, 1, padding='valid'),
                                         nn.ReLU())
-        self.cat_conv2 = nn.Conv2d(self.in_channels+1, 1, 1, 1, padding='valid')
-        self.conv = nn.Conv2d(1, self.in_channels, 1, 1, padding='valid')
+        self.cat_conv2 = nn.Conv2d(self.in_channels+1, self.in_channels, 1, 1, padding='valid')
+        # self.conv = nn.Conv2d(1, self.in_channels, 1, 1, padding='valid')
 
-        # Reconstruction Section
+        # 4) Post convolution module
         self.deconv = conv_block(64, 64, 3, dilation=2)
 
+        # 5) Reconstruction Layer
         self.out = nn.ConvTranspose2d(64, 1, 3, stride=1, dilation=2, padding=2)
 
     def forward(self, x):
+        # Section 1
         conv1 = self.conv_1(x)
         conv2 = self.conv_2(conv1)
-        add1 = x + conv2
-        conv3 = self.conv_3(add1)
+        conv3 = self.conv_2(conv2)
 
+        # Sections 2 and 3
         bmg1 = self.BMG(conv3)
         bmg2 = self.BMG(bmg1)
 
+        # Section 4
         skip1 = torch.add(conv3, bmg2)
         deconv1 = self.deconv(skip1)
         skip2 = torch.add(conv2, deconv1)
@@ -116,6 +119,7 @@ class bafnet(nn.Module):
         skip3 = torch.add(conv1, deconv2)
         deconv3 = self.deconv(skip3)
 
+        # Section 5
         out = self.out(deconv3)
         
         return out
@@ -135,9 +139,9 @@ class bafnet(nn.Module):
         fuse1 = self.cat_conv1(torch.cat([cam1, sam1, sam2, cam2], 1))
         fuse2 = self.cat_conv2(torch.cat([conv1, fuse1],1))
 
-        out = self.conv(fuse2)
+        # out = self.conv(fuse2)
 
-        return out
+        return fuse2
 
     def BMG(self, input):
         bafb1 = self.BAFB(input)
@@ -152,7 +156,5 @@ class bafnet(nn.Module):
 if __name__ == '__main__':
 
     input=(1, 120, 120)
-    # model=baf_resnet(input)
     baf_net = bafnet()
     summary(baf_net, input)
-    # model.summary()
