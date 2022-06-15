@@ -44,9 +44,9 @@ parser.add_argument('--batch_size', type=int, default=4)	# default = 5
 parser.add_argument('--image_size', type=int, default=512)
 
 parser.add_argument('--lr', type=float, default=0.0002) # 5e-5 without decaying rate
-parser.add_argument('--num_epochs', type=int, default=500)
+parser.add_argument('--num_epochs', type=int, default=200)
 parser.add_argument('--num_workers', type=int, default=4)
-parser.add_argument('--load_chkpt', type=bool, default=True)
+parser.add_argument('--load_chkpt', type=bool, default=False)
 
 parser.add_argument('--norm_range_min', type=float, default=-1024.0)
 parser.add_argument('--norm_range_max', type=float, default=3072.0)
@@ -177,7 +177,7 @@ for epoch in tq_epoch:
 
     # Save losses per epoch to gdrive and local
     local_path = './model/loss_arr.py'
-    gdrive_path = '/gdrive/MyDrive/befnet_model/loss_arr.npy'
+    gdrive_path = '/gdrive/MyDrive/bafnet_model/loss_arr.npy'
     np.save(local_path, losses, allow_pickle=True)
     np.save(gdrive_path, losses, allow_pickle=True)
 
