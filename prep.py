@@ -140,7 +140,8 @@ def printProgressBar(iteration, total, prefix='', suffix='', decimals=1, length=
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--data_path', type=str, default='../ldct-denoising/patient/')
+    parser.add_argument('--data_path', type=str, default='../ldct-denoising/patient/')  # Comment to train in google collab
+    # parser.add_argument('--data_path', type=str, default='../patient/')               # Uncomment to train in google collab
     parser.add_argument('--save_path', type=str, default='./processed_data/npy_img/')
 
     parser.add_argument('--test_patient', type=str, default='L058')
